@@ -8,14 +8,12 @@ if TYPE_CHECKING:
     from app.models.author import Author
     from app.models.category import Category
 
-class User(Base):
+class User(Base , TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(unique=True, index=True, nullable=False)
     password: Mapped[str] = mapped_column(nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
     #  for relationship
     books: Mapped[List["Book"]] = relationship(back_populates="owner")
     authors: Mapped[List["Author"]] = relationship(back_populates="owner")
