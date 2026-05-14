@@ -1,5 +1,5 @@
 from bcrypt import checkpw
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from app.database.database import get_db
@@ -9,6 +9,7 @@ from app.models.user import User
 from app.utils.jwt_token import encode_token
 from app.utils.jwt_guard import get_current_user
 from bcrypt import hashpw, gensalt
+from app.utils.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
@@ -40,7 +41,10 @@ async def create_user(user_data: UserSchema, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-async def login_user(user_data: UserSchema, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login_user(
+    request: Request,
+    user_data: UserSchema, db: Session = Depends(get_db)):
     """
     Authenticate user and return a JWT access token.
     """
