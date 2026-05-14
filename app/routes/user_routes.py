@@ -1,25 +1,28 @@
 from bcrypt import checkpw
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.utils.response_handler import response
-from app.schemas.user_schema import UserSchema
+from app.schemas.user_schema import UserSchema, UserResponse
 from app.models.user import User
 from app.utils.jwt_token import encode_token
+from app.utils.jwt_guard import get_current_user
 from bcrypt import hashpw, gensalt
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
-@router.post("/register")
-async def create_user(user_data:UserSchema,db:Session = Depends(get_db)):
-    if not user_data.email or not user_data.password:
-        return response(success=False,status_code=400,message="Please provide email and password")
-    
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def create_user(user_data: UserSchema, db: Session = Depends(get_db)):
+    """
+    Register a new user with email and password.
+    - **email**: Must be unique
+    - **password**: Must be at least 8 characters
+    """
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
-        return response(success=False,status_code=400,message="User already exists")
+        return response(success=False, status_code=400, message="User already exists")
     
     # HASH THE PASSWORD (Industry Standard)
     hashed_password = hashpw(user_data.password.encode(), gensalt()).decode()
@@ -31,43 +34,36 @@ async def create_user(user_data:UserSchema,db:Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)    
-    return response(success=True,status_code=201,message="User created successfully",data={
-        "user": {
-            "id": new_user.id,
-            "email": new_user.email,
-            "created_at": new_user.created_at
-        }
+    return response(success=True, status_code=201, message="User created successfully", data={
+        "user": UserResponse.from_orm(new_user)
     })
 
 
 @router.post("/login")
-async def login_user(user_data:UserSchema,db:Session = Depends(get_db)):
+async def login_user(user_data: UserSchema, db: Session = Depends(get_db)):
     """
-    Login user and generate JWT token
+    Authenticate user and return a JWT access token.
     """
-
-    if not user_data.email or not user_data.password:
-        return response(success=False,status_code=400,message="Please provide email and password")
-    
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if not existing_user:
-        return response(success=False,status_code=404,message="User not exist. Please register first.")
+        return response(success=False, status_code=404, message="User not exist. Please register first.")
 
     if not checkpw(user_data.password.encode(), existing_user.password.encode()):
-        return response(success=False,status_code=400,message="Invalid password")
+        return response(success=False, status_code=400, message="Invalid password")
     
     token = encode_token(existing_user.id, existing_user.email)
-    return response(success=True,status_code=200,message="Login successful",data={
-        "user": {
-            "id": existing_user.id,
-            "email": existing_user.email,
-        },
-        "token":token
-        })
+    return response(success=True, status_code=200, message="Login successful", data={
+        "user": UserResponse.from_orm(existing_user),
+        "token": token
+    })
 
 
-
-@router.get("/protected", dependencies=[Depends(security)])
-async def protected_route(auth: HTTPAuthorizationCredentials = Depends(security)):
-    return response(success=True,status_code=200,message="Protected route accessed successfully")
+@router.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    """
+    Get the current logged-in user profile.
+    """
+    return response(success=True, status_code=200, message="User profile fetched", data={
+        "user": UserResponse.from_orm(current_user)
+    })
         
