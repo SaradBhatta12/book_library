@@ -5,10 +5,12 @@ def response(
     status_code: int,
     message: str,
     data: Any = None,
+    meta: Any = None,
 ):
     return {
         "success": success,
         "status_code": status_code,
         "message": message,
-        "data": data
+        "data": data,
+        "meta": meta
     }

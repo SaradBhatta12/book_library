@@ -6,13 +6,14 @@ SECRET = settings.SECRET_KEY
 
 
 def encode_token(id:int,email:str):
+    now = datetime.datetime.now(datetime.UTC)
     payload = {
-        "sub":id,
-        "email":email,  ## feel like id is too less and its a integer so i added email too 
-        "iat":datetime.datetime.now(datetime.UTC),
-        "exp":datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=24)
+        "sub": str(id),
+        "email": email,
+        "iat": int(now.timestamp()),
+        "exp": int((now + datetime.timedelta(days=24)).timestamp())
     }
-    encoded_jwt = jwt.encode(payload,SECRET,algorithm=settings.ALGORITHM)
+    encoded_jwt = jwt.encode(payload, SECRET, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
